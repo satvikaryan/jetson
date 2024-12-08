@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>oak_video_publisher</name>
+  <version>0.1.0</version>
+  <description>OAK-D Video Publisher Node</description>
+  
+  <maintainer email="satvikaryan200429@gmail.com">Your Name</maintainer>
+  <license>BSD</license>
+  
+  <buildtool_depend>catkin</buildtool_depend>
+  
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>depthai_ros_msgs</depend>
+</package>
