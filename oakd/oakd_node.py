@@ -29,6 +29,16 @@ class OAKDVideoPublisher:
         self.rgb_cam.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1200_P)
         self.rgb_cam.setInterleaved(False)
         
+        # pipeline = dai.Pipeline()
+        # cam = pipeline.create(dai.node.ColorCamera)
+        # cam.setPreviewSize(300, 300)
+        # cam.setBoardSocket(dai.CameraBoardSocket.CAM_A)
+        # cam.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+        # cam.setInterleaved(False)
+        # cam.setColorOrder(dai.ColorCameraProperties.ColorOrder.RGB)
+
+
+
         # Stereo cameras
         self.left_cam = self.pipeline.create(dai.node.MonoCamera)
         self.right_cam = self.pipeline.create(dai.node.MonoCamera)

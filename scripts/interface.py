@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+=#!/usr/bin/env python3
+import csv  # New import for CSV handling
 from sshkeyboard import listen_keyboard, stop_listening
 from tvmc import MotionController, DoF, ControlMode
 import blessings
@@ -7,38 +8,24 @@ from time import sleep
 from threading import Thread
 from std_msgs.msg import Float32MultiArray, Int32MultiArray, Float32
 from geometry_msgs.msg import Vector3
+from sensor_msgs.msg import MagneticField
 
-
-<<<<<<< HEAD
 DATA_SOURCE = "sensors"
 
-=======
-DATA_SOURCE = "emulation"
->>>>>>> a151646a06b68e8c61835adfafc0aeea8fdb13cd
-
-HEAVE_KP = -160 # -100
+# PID and Target Configurations
+HEAVE_KP = 140
 HEAVE_KI = 0
-HEAVE_KD = -10
-<<<<<<< HEAD
-HEAVE_TARGET = 0.6
+HEAVE_KD = 5
+HEAVE_TARGET = 0.25
 HEAVE_ACCEPTABLE_ERROR = 0.01
-HEAVE_OFFSET = -4
+HEAVE_OFFSET = 5
 
-PITCH_KP = 0.5  #0.8
-PITCH_KI = 0.02
-PITCH_KD = 0.2 #0.2
-=======
-HEAVE_TARGET = 0.3
-HEAVE_ACCEPTABLE_ERROR = 0.01
-HEAVE_OFFSET = -4
-
-PITCH_KP = 1  #0.8
-PITCH_KI = 0.02
-PITCH_KD = 0.1 #0.2
->>>>>>> a151646a06b68e8c61835adfafc0aeea8fdb13cd
+PITCH_KP = 0.8
+PITCH_KI = 0
+PITCH_KD = 0.5
 PITCH_TARGET = 0
-PITCH_ACCEPTABLE_ERROR = .7
-PITCH_OFFSET = 0 #5
+PITCH_ACCEPTABLE_ERROR = 0.7
+PITCH_OFFSET = 5
 
 ROLL_KP = 1
 ROLL_KI = 0
@@ -46,26 +33,24 @@ ROLL_KD = 0.4
 ROLL_TARGET = 0
 ROLL_ACCEPTABLE_ERROR = 1.5
 
-<<<<<<< HEAD
-YAW_KP = 2.1 # 0.86
-YAW_KI = 0.05
-YAW_KD = 0.7 # 0.3
-=======
-YAW_KP = 1.5 # 0.86
-YAW_KI = 0.05
-YAW_KD = 0.4 # 0.3
->>>>>>> a151646a06b68e8c61835adfafc0aeea8fdb13cd
-YAW_TARGET = 225
+YAW_KP = -1.1
+YAW_KI = 0
+YAW_KD = -130
+YAW_TARGET = 45
 YAW_ACCEPTABLE_ERROR = 1
 
-
+# Controller and Diagnostics
 m = MotionController()
 term = blessings.Terminal()
-
 closed_loop_enabled = set()
 currently_doing = set()
 diagnostics = {}
 keep_rendering = True
+
+# CSV File Setup
+csv_file = open("pwm_log.csv", mode="w", newline="")
+csv_writer = csv.writer(csv_file)
+csv_writer.writerow(["Timestamp", "PWM Values"])  # CSV Header
 
 
 def render():
@@ -105,6 +90,7 @@ def render():
                     print(term.clear_eol())
                 x = x - 1
                 sleep(0.01)
+                
     print(term.exit_fullscreen())
 
 
@@ -113,7 +99,7 @@ def thrust(dof, rev=1):
         if dof in closed_loop_enabled:
             return
 
-        m.set_thrust(dof, 78 * rev)
+        m.set_thrust(dof, 50 * rev)
         currently_doing.add(dof)
 
     def r():
@@ -144,7 +130,7 @@ def pid_enable(dof):
 
     if dof == DoF.PITCH:
         m.set_pid_constants(
-            DoF.PITCH, PITCH_KP, PITCH_KI, PITCH_KD, PITCH_ACCEPTABLE_ERROR, PITCH_OFFSET
+            DoF.PITCH, PITCH_KP, PITCH_KI, PITCH_KD, PITCH_ACCEPTABLE_ERROR
         )
         m.set_pid_limits(DoF.PITCH, -10, 10, -25, 25)
         m.set_target_point(DoF.PITCH, PITCH_TARGET)
@@ -155,7 +141,6 @@ def pid_enable(dof):
 
     if dof == DoF.YAW:
         m.set_pid_constants(DoF.YAW, YAW_KP, YAW_KI, YAW_KD, YAW_ACCEPTABLE_ERROR)
-        m.set_pid_limits(DoF.YAW, -20, 20, -50, 50)
         m.set_target_point(DoF.YAW, YAW_TARGET)
 
 
@@ -187,6 +172,8 @@ mp = {
     "j": pid(DoF.PITCH),
     "k": pid(DoF.ROLL),
     "l": pid(DoF.YAW),
+    "p": thrust(DoF.PITCH, 1),
+    "o": thrust(DoF.PITCH, -1)
 }
 
 
@@ -204,18 +191,16 @@ def data():
     def set(name, data):
         diagnostics[name] = data
 
-    # subscribe to any topics that you'd like to subscribe to,
-    # and then make them update diagnostics_data to have stuff update
-    # in real time
-
-    # you should also set up subcribers to
-    # update the current point for all PID controllers here
+    # Subscribe to ROS topics
+    rospy.Subscriber(
+        "/control/pwm",
+        Int32MultiArray,
+        lambda msg: log_pwm_data(msg.data)
+    )
 
     rospy.Subscriber(
         "/rose_tvmc/thrust", Float32MultiArray, lambda x: set("Thrust", x.data)
     )
-
-    rospy.Subscriber("/control/pwm", Int32MultiArray, lambda x: set("PWM", x.data))
 
     rospy.Subscriber(
         f"/{DATA_SOURCE}/linear_acceleration",
@@ -231,22 +216,17 @@ def data():
 
     rospy.Subscriber(
         f"/{DATA_SOURCE}/magnetic_field",
-        Vector3,
-        lambda x: set("Magnetic Field", (x.x, x.y, x.z)),
+        MagneticField,
+        lambda x: set("Magnetic Field", (x.magnetic_field.x, x.magnetic_field.y, x.magnetic_field.z)),
     )
 
     def orientation(x):
         m.set_current_point(DoF.ROLL, x.x)
         m.set_current_point(DoF.PITCH, x.y)
         m.set_current_point(DoF.YAW, x.z)
-        global YAW_TARGET
-        YAW_TARGET=x.z
         set("Roll", x.x)
         set("Pitch", x.y)
         set("Yaw", x.z)
-
-        global YAW_TARGET
-        YAW_TARGET = x.z
 
     rospy.Subscriber(f"/{DATA_SOURCE}/orientation", Vector3, orientation)
 
@@ -255,6 +235,12 @@ def data():
         set("Depth", d.data)
 
     rospy.Subscriber(f"/{DATA_SOURCE}/depth", Float32, depth)
+
+
+def log_pwm_data(pwm_values):
+    """Log PWM data into the CSV file."""
+    timestamp = rospy.get_time()  
+    csv_writer.writerow([timestamp, pwm_values])
 
 
 if __name__ == "__main__":
@@ -266,12 +252,14 @@ if __name__ == "__main__":
 
     data()
 
-    listen_keyboard(
-        on_press=press,
-        on_release=release,
-    )
-
-    keep_rendering = False
-    print(term.clear())
-    print("Bye-bye!\n\n")
-    exit(0)
+    try:
+        listen_keyboard(
+            on_press=press,
+            on_release=release,
+        )
+    finally:
+        keep_rendering = False
+        csv_file.close()  
+        print(term.clear())
+        print("Bye-bye!\n\n")
+        exit(0)
